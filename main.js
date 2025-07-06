@@ -10,6 +10,21 @@ const axios = require("axios");
 const listPackage = JSON.parse(readFileSync("./package.json")).dependencies;
 const listbuiltinModules = require("module").builtinModules;
 
+// ========= Xóa cache trước khi bot chạy =========
+const cachePath = path.join(__dirname, "modules", "commands", "cache");
+const foldersToDelete = ["ta", "taanime", "tagai"];
+
+for (const folder of foldersToDelete) {
+    const folderPath = path.join(cachePath, folder);
+    if (fs.existsSync(folderPath)) {
+        fs.removeSync(folderPath);
+        console.log(`✅ Đã xóa cache: ${folder}`);
+    } else {
+        console.log(`⚠️ Không tìm thấy cache: ${folder}`);
+    }
+}
+// ================================================
+
 global.client = new Object({
     commands: new Map(),
     superBan: new Map(),
