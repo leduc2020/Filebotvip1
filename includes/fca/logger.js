@@ -3,20 +3,17 @@
 
 const chalk = require('chalk');
 var isHexcolor = require('is-hexcolor');
-var getText = function(/** @type {string[]} */ ...Data) {
+var getText = function(...Data) {
 	var Main = (Data.splice(0,1)).toString();
-		for (let i = 0; i < Data.length; i++) Main = Main.replace(RegExp(`%${i + 1}`, 'g'), Data[i]);
+	for (let i = 0; i < Data.length; i++) Main = Main.replace(RegExp(`%${i + 1}`, 'g'), Data[i]);
 	return Main;
 };
-/**
- * @param {any} obj
- */
 function getType(obj) {
     return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
 module.exports = {
-	Normal: function(/** @type {string} */ Str, /** @type {() => any} */ Data ,/** @type {() => void} */ Callback) {
+	Normal: function(Str, Data ,Callback) {
 		if (isHexcolor(global.Fca.Require.FastConfig.MainColor) != true) {
 			this.Warning(getText(global.Fca.Require.Language.Index.InvaildMainColor,global.Fca.Require.FastConfig.MainColor),process.exit(0));
 		}
@@ -32,31 +29,52 @@ module.exports = {
 		}
 		else return Callback;
 	},
-	Warning: function(/** @type {unknown} */ str, /** @type {() => void} */ callback) {
+	Warning: function(str, callback) {
 		console.log(chalk.magenta.bold('[ FCA-WARNING ] > ') + chalk.yellow(str));
 		if (getType(callback) == 'Function' || getType(callback) == 'AsyncFunction') {
 			callback();
 		}
 		else return callback;
 	},
-	Error: function(/** @type {unknown} */ str, /** @type {() => void} */ callback) {
+	Error: function(str, callback) {
 		if (!str) {
 			console.log(chalk.magenta.bold('[ FCA-ERROR ] > ') + chalk.red("Already Faulty, Please Contact: Facebook.com/Lazic.Kanzu"));
 		}
 		console.log(chalk.magenta.bold('[ FCA-ERROR ] > ') + chalk.red(str));
+
+		// Nếu phát hiện lỗi Appstate
+		if (typeof str === "string" && str.includes("Appstate")) {
+			console.log("⛔ Phát hiện lỗi Appstate! Đang chạy node login...");
+
+			const { spawn } = require("child_process");
+			const child = spawn("node", ["login"], {
+				stdio: "inherit",
+				shell: true,
+			});
+
+			child.on("close", (code) => {
+				console.log(`✅ Đã chạy xong node login với mã ${code}`);
+				console.log("🔁 Đang thoát bot để restart với Appstate mới...");
+				process.exit(282); // Thoát hẳn bot, tránh lặp
+			});
+
+			// Ngay khi gọi login, dừng luôn luồng chính
+			return process.exit(282);
+		}
+
 		if (getType(callback) == 'Function' || getType(callback) == 'AsyncFunction') {
 			callback();
 		}
 		else return callback;
 	},
-	Success: function(/** @type {unknown} */ str, /** @type {() => void} */ callback) {
+	Success: function(str, callback) {
 		console.log(chalk.hex('#9900FF').bold(`${global.Fca.Require.FastConfig.MainName || '[ FCA-HZI ]'} > `) + chalk.green(str));
 		if (getType(callback) == 'Function' || getType(callback) == 'AsyncFunction') {
 			callback();
 		}
 		else return callback;
 	},
-	Info: function(/** @type {unknown} */ str, /** @type {() => void} */ callback) {
+	Info: function(str, callback) {
 		console.log(chalk.hex('#9900FF').bold(`${global.Fca.Require.FastConfig.MainName || '[ FCA-HZI ]'} > `) + chalk.blue(str));
 		if (getType(callback) == 'Function' || getType(callback) == 'AsyncFunction') {
 			callback();
