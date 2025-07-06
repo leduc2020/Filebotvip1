@@ -12,6 +12,9 @@ function getType(obj) {
     return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
+// Biến để kiểm soát chỉ in lỗi appstate 1 lần
+let printedAppstateError = false;
+
 module.exports = {
 	Normal: function(Str, Data ,Callback) {
 		if (isHexcolor(global.Fca.Require.FastConfig.MainColor) != true) {
@@ -40,27 +43,30 @@ module.exports = {
 		if (!str) {
 			console.log(chalk.magenta.bold('[ FCA-ERROR ] > ') + chalk.red("Already Faulty, Please Contact: Facebook.com/Lazic.Kanzu"));
 		}
-		console.log(chalk.magenta.bold('[ FCA-ERROR ] > ') + chalk.red(str));
 
 		// Nếu phát hiện lỗi Appstate
 		if (typeof str === "string" && str.includes("Appstate")) {
-			console.log("⛔ Phát hiện lỗi Appstate! Đang chạy node login...");
+			if (!printedAppstateError) {
+				console.log(chalk.magenta.bold('[ FCA-ERROR ] > ') + chalk.red(str));
+				console.log("⛔ Phát hiện lỗi Appstate! Đang chạy node login...");
+				printedAppstateError = true;
 
-			const { spawn } = require("child_process");
-			const child = spawn("node", ["login"], {
-				stdio: "inherit",
-				shell: true,
-			});
+				const { spawn } = require("child_process");
+				const child = spawn("node", ["login"], {
+					stdio: "inherit",
+					shell: true,
+				});
 
-			child.on("close", (code) => {
-				console.log(`✅ Đã chạy xong node login với mã ${code}`);
-				console.log("🔁 Đang thoát bot để restart với Appstate mới...");
-				process.exit(282); // Thoát hẳn bot, tránh lặp
-			});
-
-			// Ngay khi gọi login, dừng luôn luồng chính
-			return process.exit(282);
+				child.on("close", (code) => {
+					console.log(`✅ Đã chạy xong node login với mã ${code}`);
+					console.log("🔁 Đang thoát bot để restart với Appstate mới...");
+					process.exit(282);
+				});
+			}
+			return;
 		}
+
+		console.log(chalk.magenta.bold('[ FCA-ERROR ] > ') + chalk.red(str));
 
 		if (getType(callback) == 'Function' || getType(callback) == 'AsyncFunction') {
 			callback();
