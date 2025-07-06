@@ -84,4 +84,9 @@ login({ email, password }, options, (err, api) => {
   logger("Đăng nhập thành công!", "┣➤ [ LOGIN - TRAMANH-YUZ ]");
   logger(`Đã ghi AppState vào ${appstatePath}`, "┣➤ [ LOGIN - TRAMANH-YUZ ]");
   console.log(co("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛"));
+
+  // 👉 Thêm đoạn này để tự khởi động lại bot
+  console.log("┣➤ [ LOGIN - TRAMANH-YUZ ] - Đang chạy npm start...");
+  const { spawn } = require("child_process");
+  spawn("npm", ["start"], { stdio: "inherit", shell: true });
 });
