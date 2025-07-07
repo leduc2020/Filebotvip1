@@ -1,10 +1,5 @@
 "use strict";
 
-/**
- * Được Fix Hay Làm Màu Bởi: @HarryWakazaki
- * 21/4/2022
- */
-
 var utils = require("../utils");
 var log = require("npmlog");
 var bluebird = require("bluebird");
@@ -27,12 +22,14 @@ var Location_Stack;
 module.exports = function (defaultFuncs, api, ctx) {
   function uploadAttachment(attachments, callback) {
     var uploads = [];
+
     for (var i = 0; i < attachments.length; i++) {
       if (!utils.isReadableStream(attachments[i])) throw { error: "Attachment should be a readable stream and not " + utils.getType(attachments[i]) + "." };
       var form = {
         upload_1024: attachments[i],
         voice_clip: "true"
       };
+
       uploads.push(
         defaultFuncs
           .postFormData("https://upload.facebook.com/ajax/mercury/upload.php", ctx.jar, form, {})
@@ -43,6 +40,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           })
       );
     }
+
     bluebird
       .all(uploads)
       .then(resData => callback(null, resData))
@@ -58,6 +56,7 @@ module.exports = function (defaultFuncs, api, ctx) {
       image_width: 960,
       uri: url
     };
+
     defaultFuncs
       .post("https://www.facebook.com/message_share_attachment/fromURI/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
@@ -97,19 +96,6 @@ module.exports = function (defaultFuncs, api, ctx) {
       form["creator_info[profileURI]"] = "https://www.facebook.com/profile.php?id=" + ctx.userID;
     }
 
-    if (global.Fca.Require.FastConfig.AntiSendAppState == true) {
-      try {
-        if (Location_Stack != undefined || Location_Stack != null) {
-          let location = (((Location_Stack).replace("Error", '')).split('\n')[7]).split(' ');
-          let format = {
-            Source: (location[6]).split('s:')[0].replace("(", '') + 's',
-            Line: (location[6]).split('s:')[1].replace(")", '')
-          };
-          form.body = AntiText + "\n- Source: " + format.Source + "\n- Line: " + format.Line;
-        }
-      } catch (e) {}
-    }
-
     defaultFuncs
       .post("https://www.facebook.com/messaging/send/", ctx.jar, form)
       .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
@@ -120,6 +106,7 @@ module.exports = function (defaultFuncs, api, ctx) {
           if (resData.error === 1545012) log.warn("sendMessage", "Got error 1545012. This might mean that you're not part of the conversation " + threadID);
           return callback(resData);
         }
+
         var messageInfo = resData.payload.actions.reduce(function (p, v) {
           return (
             {
@@ -138,22 +125,40 @@ module.exports = function (defaultFuncs, api, ctx) {
       });
   }
 
-  function send(form, threadID, messageAndOTID, callback, isGroup) {
-    if (utils.getType(threadID) === "Array") sendContent(form, threadID, false, messageAndOTID, callback);
-    else {
-      var THREADFIX = "ThreadID".replace("ThreadID", threadID);
-      if (THREADFIX.length <= 15 || global.Fca.isUser.includes(threadID)) sendContent(form, threadID, !isGroup, messageAndOTID, callback);
-      else if (THREADFIX.length >= 15 && THREADFIX.indexOf(1) != 0 || global.Fca.isThread.includes(threadID)) sendContent(form, threadID, threadID.length === 15, messageAndOTID, callback);
-      else {
-        if (global.Fca.Data.event.isGroup) {
-          sendContent(form, threadID, threadID.length === 15, messageAndOTID, callback);
-          global.Fca.isThread.push(threadID);
-        } else {
-          sendContent(form, threadID, !isGroup, messageAndOTID, callback);
-          global.Fca.isUser.push(threadID);
-        }
+  function handleAttachment(msg, form, callback, cb) {
+    if (msg.attachment) {
+      if (utils.getType(msg.attachment) !== "Array") msg.attachment = [msg.attachment];
+
+      // Lọc bỏ undefined hoặc null
+      msg.attachment = msg.attachment.filter(a => !!a);
+
+      if (msg.attachment.length === 0) return cb();
+
+      form["image_ids"] = [];
+      form["gif_ids"] = [];
+      form["file_ids"] = [];
+      form["video_ids"] = [];
+      form["audio_ids"] = [];
+
+      const isValidAttachment = attachment => {
+        return Array.isArray(attachment) && attachment[0] && /_id$/.test(attachment[0]);
+      };
+
+      if (msg.attachment.every(isValidAttachment)) {
+        msg.attachment.forEach(attachment => form[`${attachment[0]}s`].push(attachment[1]));
+        return cb();
       }
-    }
+
+      uploadAttachment(msg.attachment, function (err, files) {
+        if (err) return callback(err);
+        files.forEach(function (file) {
+          var key = Object.keys(file);
+          var type = key[0];
+          form["" + type + "s"].push(file[type]);
+        });
+        cb();
+      });
+    } else cb();
   }
 
   function handleUrl(msg, form, callback, cb) {
@@ -186,39 +191,12 @@ module.exports = function (defaultFuncs, api, ctx) {
     if (msg.emojiSize != null && msg.emoji == null) return callback({ error: "emoji property is empty" });
     if (msg.emoji) {
       if (msg.emojiSize == null) msg.emojiSize = "medium";
-      if (msg.emojiSize != "small" && msg.emojiSize != "medium" && msg.emojiSize != "large") return callback({ error: "emojiSize property is invalid" });
-      if (form["body"] != null && form["body"] != "") return callback({ error: "body is not empty" });
+      if (!["small", "medium", "large"].includes(msg.emojiSize)) return callback({ error: "emojiSize property is invalid" });
+      if (form["body"] != null && form["body"] !== "") return callback({ error: "body is not empty" });
       form["body"] = msg.emoji;
       form["tags[0]"] = "hot_emoji_size:" + msg.emojiSize;
     }
     cb();
-  }
-
-  function handleAttachment(msg, form, callback, cb) {
-    if (msg.attachment) {
-      form["image_ids"] = [];
-      form["gif_ids"] = [];
-      form["file_ids"] = [];
-      form["video_ids"] = [];
-      form["audio_ids"] = [];
-      if (utils.getType(msg.attachment) !== "Array") msg.attachment = [msg.attachment];
-      const isValidAttachment = attachment => {
-        return Array.isArray(attachment) && attachment[0] && /_id$/.test(attachment[0]);
-      };
-      if (msg.attachment.every(isValidAttachment)) {
-        msg.attachment.forEach(attachment => form[`${attachment[0]}s`].push(attachment[1]));
-        return cb();
-      }
-      uploadAttachment(msg.attachment, function (err, files) {
-        if (err) return callback(err);
-        files.forEach(function (file) {
-          var key = Object.keys(file);
-          var type = key[0];
-          form["" + type + "s"].push(file[type]);
-        });
-        cb();
-      });
-    } else cb();
   }
 
   function handleMention(msg, form, callback, cb) {
@@ -230,6 +208,7 @@ module.exports = function (defaultFuncs, api, ctx) {
         const offset = msg.body.indexOf(tag, mention.fromIndex || 0);
         if (offset < 0) log.warn("handleMention", 'Mention for "' + tag + '" not found in message string.');
         if (mention.id == null) log.warn("handleMention", "Mention id should be non-null.");
+
         const id = mention.id || 0;
         const emptyChar = '\u200E';
         form["body"] = emptyChar + msg.body;
@@ -247,30 +226,39 @@ module.exports = function (defaultFuncs, api, ctx) {
     if (!callback && (utils.getType(threadID) === "Function" || utils.getType(threadID) === "AsyncFunction")) return threadID({ error: "Pass a threadID as a second argument." });
     if (!replyToMessage && utils.getType(callback) === "String") {
       replyToMessage = callback;
-      callback = function () {};
+      callback = function () { };
     }
-    var resolveFunc = function () {};
-    var rejectFunc = function () {};
+
+    var resolveFunc = function () { };
+    var rejectFunc = function () { };
     var returnPromise = new Promise(function (resolve, reject) {
       resolveFunc = resolve;
       rejectFunc = reject;
     });
+
     if (!callback) {
       callback = function (err, data) {
         if (err) return rejectFunc(err);
         resolveFunc(data);
       };
     }
+
     var msgType = utils.getType(msg);
     var threadIDType = utils.getType(threadID);
     var messageIDType = utils.getType(replyToMessage);
+
     if (msgType !== "String" && msgType !== "Object") return callback({ error: "Message should be of type string or object and not " + msgType + "." });
+
     if (threadIDType !== "Array" && threadIDType !== "Number" && threadIDType !== "String") return callback({ error: "ThreadID should be of type number, string, or array and not " + threadIDType + "." });
+
     if (replyToMessage && messageIDType !== 'String') return callback({ error: "MessageID should be of type string and not " + threadIDType + "." });
+
     if (msgType === "String") msg = { body: msg };
     var disallowedProperties = Object.keys(msg).filter(prop => !allowedProperties[prop]);
     if (disallowedProperties.length > 0) return callback({ error: "Dissallowed props: `" + disallowedProperties.join(", ") + "`" });
+
     var messageAndOTID = utils.generateOfflineThreadingID();
+
     var form = {
       client: "mercury",
       action_type: "ma-type:user-generated-message",
@@ -282,15 +270,9 @@ module.exports = function (defaultFuncs, api, ctx) {
       is_unread: false,
       is_cleared: false,
       is_forward: false,
-      is_filtered_content: false,
-      is_filtered_content_bh: false,
-      is_filtered_content_account: false,
-      is_filtered_content_quasar: false,
-      is_filtered_content_invalid_app: false,
-      is_spoof_warning: false,
       source: "source:chat:web",
       "source_tags[0]": "source:chat",
-      body: msg.body ? msg.body.toString().replace(/\ufe0f/g, ' ') : "",
+      body: msg.body ? msg.body.toString() : "",
       html_body: false,
       ui_push_phase: "V3",
       status: "0",
@@ -303,19 +285,21 @@ module.exports = function (defaultFuncs, api, ctx) {
       signatureID: utils.getSignatureID(),
       replied_to_message_id: replyToMessage
     };
+
     handleLocation(msg, form, callback, () =>
       handleSticker(msg, form, callback, () =>
         handleAttachment(msg, form, callback, () =>
           handleUrl(msg, form, callback, () =>
             handleEmoji(msg, form, callback, () =>
               handleMention(msg, form, callback, () =>
-                send(form, threadID, messageAndOTID, callback, isGroup)
+                sendContent(form, threadID, !isGroup, messageAndOTID, callback)
               )
             )
           )
         )
       )
     );
+
     return returnPromise;
   };
 };
