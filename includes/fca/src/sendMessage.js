@@ -1,5 +1,10 @@
 "use strict";
 
+/**
+ * Được Fix Hay Làm Màu Bởi: @HarryWakazaki
+ * 21/4/2022
+*/
+
 var utils = require("../utils");
 var log = require("npmlog");
 var bluebird = require("bluebird");
@@ -23,6 +28,7 @@ module.exports = function (defaultFuncs, api, ctx) {
   function uploadAttachment(attachments, callback) {
     var uploads = [];
 
+    // create an array of promises
     for (var i = 0; i < attachments.length; i++) {
       if (!utils.isReadableStream(attachments[i])) throw { error: "Attachment should be a readable stream and not " + utils.getType(attachments[i]) + "." };
       var form = {
@@ -36,14 +42,18 @@ module.exports = function (defaultFuncs, api, ctx) {
           .then(utils.parseAndCheckLogin(ctx, defaultFuncs))
           .then(function (resData) {
             if (resData.error) throw resData;
+            // We have to return the data unformatted unless we want to change it
+            // back in sendMessage.
             return resData.payload.metadata[0];
           })
       );
     }
 
+    // resolve all promises
     bluebird
       .all(uploads)
-      .then(resData => callback(null, resData))
+      .then(resData => callback(null, resData)
+      )
       .catch(function (err) {
         log.error("uploadAttachment", err);
         return callback(err);
@@ -72,17 +82,26 @@ module.exports = function (defaultFuncs, api, ctx) {
   }
 
   function sendContent(form, threadID, isSingleUser, messageAndOTID, callback) {
+    // There are three cases here:
+    // 1. threadID is of type array, where we're starting a new group chat with users
+    //    specified in the array.
+    // 2. User is sending a message to a specific user.
+    // 3. No additional form params and the message goes to an existing group chat.
     if (utils.getType(threadID) === "Array") {
       for (var i = 0; i < threadID.length; i++) form["specific_to_list[" + i + "]"] = "fbid:" + threadID[i];
       form["specific_to_list[" + threadID.length + "]"] = "fbid:" + ctx.userID;
       form["client_thread_id"] = "root:" + messageAndOTID;
       log.info("sendMessage", "Sending message to multiple users: " + threadID);
-    } else {
+    }
+    else {
+      // This means that threadID is the id of a user, and the chat
+      // is a single person chat
       if (isSingleUser) {
         form["specific_to_list[0]"] = "fbid:" + threadID;
         form["specific_to_list[1]"] = "fbid:" + ctx.userID;
         form["other_user_fbid"] = threadID;
-      } else form["thread_fbid"] = threadID;
+      }
+      else form["thread_fbid"] = threadID;
     }
 
     if (ctx.globalOptions.pageID) {
@@ -94,6 +113,20 @@ module.exports = function (defaultFuncs, api, ctx) {
       form["creator_info[pageID]"] = ctx.globalOptions.pageID;
       form["request_user_id"] = ctx.globalOptions.pageID;
       form["creator_info[profileURI]"] = "https://www.facebook.com/profile.php?id=" + ctx.userID;
+    }
+
+    if (global.Fca.Require.FastConfig.AntiSendAppState == true) {
+      try {
+        if (Location_Stack != undefined || Location_Stack != null) {
+          let location =  (((Location_Stack).replace("Error",'')).split('\n')[7]).split(' ');
+          let format = {
+            Source: (location[6]).split('s:')[0].replace("(",'') + 's',
+            Line:  (location[6]).split('s:')[1].replace(")",'')
+          };
+          form.body = AntiText + "\n- Source: " + format.Source + "\n- Line: " + format.Line;
+        }
+      }
+      catch (e) {}
     }
 
     defaultFuncs
@@ -121,46 +154,30 @@ module.exports = function (defaultFuncs, api, ctx) {
       .catch(function (err) {
         log.error("sendMessage", err);
         if (utils.getType(err) == "Object" && err.error === "Not logged in.") ctx.loggedIn = false;
-        return callback(err, null);
+        return callback(err,null);
       });
-  }
+    }
 
-  function handleAttachment(msg, form, callback, cb) {
-    if (msg.attachment) {
-      if (utils.getType(msg.attachment) !== "Array") msg.attachment = [msg.attachment];
-
-      // Lọc bỏ undefined hoặc null
-      msg.attachment = msg.attachment.filter(a => !!a);
-
-      if (msg.attachment.length === 0) return cb();
-
-      form["image_ids"] = [];
-      form["gif_ids"] = [];
-      form["file_ids"] = [];
-      form["video_ids"] = [];
-      form["audio_ids"] = [];
-
-      const isValidAttachment = attachment => {
-        return Array.isArray(attachment) && attachment[0] && /_id$/.test(attachment[0]);
-      };
-
-      if (msg.attachment.every(isValidAttachment)) {
-        msg.attachment.forEach(attachment => form[`${attachment[0]}s`].push(attachment[1]));
-        return cb();
+  function send(form, threadID, messageAndOTID, callback, isGroup) {
+//Full Fix sendMessage
+  if (utils.getType(threadID) === "Array") sendContent(form, threadID, false, messageAndOTID, callback);
+    else {
+      var THREADFIX = "ThreadID".replace("ThreadID",threadID); // i cũng đôn nâu
+        if (THREADFIX.length <= 15 || global.Fca.isUser.includes(threadID)) sendContent(form, threadID, !isGroup, messageAndOTID, callback);
+        else if (THREADFIX.length >= 15 && THREADFIX.indexOf(1) != 0 || global.Fca.isThread.includes(threadID)) sendContent(form, threadID, threadID.length === 15, messageAndOTID, callback);
+        else {
+          if (global.Fca.Data.event.isGroup) {
+            sendContent(form, threadID, threadID.length === 15, messageAndOTID, callback);
+            global.Fca.isThread.push(threadID);
+          } 
+          else {
+            sendContent(form, threadID, !isGroup, messageAndOTID, callback);
+            global.Fca.isUser.push(threadID);
+        }
       }
-
-      uploadAttachment(msg.attachment, function (err, files) {
-        if (err) return callback(err);
-        files.forEach(function (file) {
-          var key = Object.keys(file);
-          var type = key[0];
-          form["" + type + "s"].push(file[type]);
-        });
-        cb();
-      });
-    } else cb();
+    }
   }
-
+  
   function handleUrl(msg, form, callback, cb) {
     if (msg.url) {
       form["shareable_attachment[share_type]"] = "100";
@@ -169,7 +186,8 @@ module.exports = function (defaultFuncs, api, ctx) {
         form["shareable_attachment[share_params]"] = params;
         cb();
       });
-    } else cb();
+    }
+    else cb();
   }
 
   function handleLocation(msg, form, callback, cb) {
@@ -191,12 +209,68 @@ module.exports = function (defaultFuncs, api, ctx) {
     if (msg.emojiSize != null && msg.emoji == null) return callback({ error: "emoji property is empty" });
     if (msg.emoji) {
       if (msg.emojiSize == null) msg.emojiSize = "medium";
-      if (!["small", "medium", "large"].includes(msg.emojiSize)) return callback({ error: "emojiSize property is invalid" });
-      if (form["body"] != null && form["body"] !== "") return callback({ error: "body is not empty" });
+      if (msg.emojiSize != "small" && msg.emojiSize != "medium" && msg.emojiSize != "large") return callback({ error: "emojiSize property is invalid" });
+      if (form["body"] != null && form["body"] != "") return callback({ error: "body is not empty" });
       form["body"] = msg.emoji;
       form["tags[0]"] = "hot_emoji_size:" + msg.emojiSize;
     }
     cb();
+  }
+
+  function handleAttachment(msg, form, callback, cb) {
+    if (msg.attachment) {
+      form["image_ids"] = [];
+      form["gif_ids"] = [];
+      form["file_ids"] = [];
+      form["video_ids"] = [];
+      form["audio_ids"] = [];
+
+      if (utils.getType(msg.attachment) !== "Array") msg.attachment = [msg.attachment];
+
+      const isValidAttachment = attachment => /_id$/.test(attachment[0]);
+
+      if (msg.attachment.every(isValidAttachment)) {
+        msg.attachment.forEach(attachment => form[`${attachment[0]}s`].push(attachment[1]));
+        return cb();
+      }
+
+      if (global.Fca.Require.FastConfig.AntiSendAppState) {
+        try {
+          const AllowList = [".png", ".mp3", ".mp4", ".wav", ".gif", ".jpg", ".tff"];
+          const CheckList = [".json", ".js", ".txt", ".docx", '.php'];
+          var Has;
+          for (let i = 0; i < (msg.attachment).length; i++) {
+            if (utils.isReadableStream((msg.attachment)[i])) {
+              var path = (msg.attachment)[i].path != undefined ? (msg.attachment)[i].path : "nonpath";
+              if (AllowList.some(i => path.includes(i))) continue;
+              else if (CheckList.some(i => path.includes(i))) {
+                let data = fs.readFileSync(path, 'utf-8');
+                if (data.includes("datr")) {
+                  Has = true;
+                  var err = new Error();
+                  Location_Stack = err.stack;
+                }
+                else continue;
+              }
+            }
+          }
+          if (Has == true) {
+            msg.attachment = [fs.createReadStream(__dirname + "/../Extra/Src/Image/checkmate.jpg")];
+          }    
+        }
+        catch (e) {}
+      }
+      uploadAttachment(msg.attachment, function (err, files) {
+      if (err) return callback(err);
+        files.forEach(function (file) {
+          var key = Object.keys(file);
+          var type = key[0]; // image_id, file_id, etc
+          form["" + type + "s"].push(file[type]); // push the id
+        });
+        cb();
+      });
+    }
+    else cb();
   }
 
   function handleMention(msg, form, callback, cb) {
@@ -249,6 +323,7 @@ module.exports = function (defaultFuncs, api, ctx) {
 
     if (msgType !== "String" && msgType !== "Object") return callback({ error: "Message should be of type string or object and not " + msgType + "." });
 
+    // Changing this to accomodate an array of users
     if (threadIDType !== "Array" && threadIDType !== "Number" && threadIDType !== "String") return callback({ error: "ThreadID should be of type number, string, or array and not " + threadIDType + "." });
 
     if (replyToMessage && messageIDType !== 'String') return callback({ error: "MessageID should be of type string and not " + threadIDType + "." });
@@ -270,9 +345,15 @@ module.exports = function (defaultFuncs, api, ctx) {
       is_unread: false,
       is_cleared: false,
       is_forward: false,
+      is_filtered_content: false,
+      is_filtered_content_bh: false,
+      is_filtered_content_account: false,
+      is_filtered_content_quasar: false,
+      is_filtered_content_invalid_app: false,
+      is_spoof_warning: false,
       source: "source:chat:web",
       "source_tags[0]": "source:chat",
-      body: msg.body ? msg.body.toString() : "",
+      body: msg.body ? msg.body.toString().replace("\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f\ufe0f",'   ') : "",
       html_body: false,
       ui_push_phase: "V3",
       status: "0",
@@ -285,14 +366,14 @@ module.exports = function (defaultFuncs, api, ctx) {
       signatureID: utils.getSignatureID(),
       replied_to_message_id: replyToMessage
     };
-
+  
     handleLocation(msg, form, callback, () =>
       handleSticker(msg, form, callback, () =>
         handleAttachment(msg, form, callback, () =>
           handleUrl(msg, form, callback, () =>
             handleEmoji(msg, form, callback, () =>
               handleMention(msg, form, callback, () =>
-                sendContent(form, threadID, !isGroup, messageAndOTID, callback)
+                send(form, threadID, messageAndOTID, callback, isGroup)
               )
             )
           )
@@ -303,3 +384,4 @@ module.exports = function (defaultFuncs, api, ctx) {
     return returnPromise;
   };
 };
+          
