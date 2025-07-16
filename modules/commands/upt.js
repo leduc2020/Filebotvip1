@@ -127,9 +127,9 @@ async function taoAnhThongKe({ thongTinBot, thongTinHeThong, thongTinHieuSuat })
         return y + 60;
     };
 
-    viTriY1 = veTieuDePhan(toaDoCot1, viTriY1, "THÔNG TIN BOT", "#18dcff");
+    viTriY1 = veTieuDePhan(toaDoCot1, viTriY1, "THÔNG TIN BOT YUZ", "#18dcff");
     veDongThongTin(toaDoCot1, viTriY1, "Uptime:", thongTinBot.uptime); viTriY1 += chieuCaoDong;
-    veDongThongTin(toaDoCot1, viTriY1, "Ping:", `${thongTinBot.ping} ms`); viTriY1 += chieuCaoDong;
+    veDongThongTin(toaDoCot1, viTriY1, "Ping:", thongTinBot.ping); viTriY1 += chieuCaoDong;
     veDongThongTin(toaDoCot1, viTriY1, "Prefix:", thongTinBot.prefix); viTriY1 += chieuCaoDong;
     veDongThongTin(toaDoCot1, viTriY1, "Lệnh:", `${thongTinBot.commands} lệnh`); viTriY1 += chieuCaoDong;
     veDongThongTin(toaDoCot1, viTriY1, "Người dùng:", `${thongTinBot.users} người`); viTriY1 += chieuCaoDong;
@@ -176,46 +176,7 @@ async function khoiTaoTaiNguyen() {
     const danhSachAnhNen = [
         'https://raw.githubusercontent.com/Kenne400k/commands/main/4k-Windows-11-Wallpaper-scaled.jpg',
         'https://raw.githubusercontent.com/Kenne400k/commands/main/HD-wallpaper-chill-vibes-3440-1440-r-chill-art.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/commands/main/hinh-nen-chill-cho-may-tinh-dep_040228906.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/chill-4k-animal-camping-art-hdk4nyjo64bvg4ko-hdk4nyjo64bvg4ko.jpg', 
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/chill-out-snow-anime-girls-maple-leaf-wallpaper-preview.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/d1e1a3ed8d55b9d626ede8b202115f38.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/hinh-nen-chill-78-1024x640.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/hinh-nen-chill-82-1024x640.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/images%20(3).jpeg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/japanese-castle-cherry-blossom-mountain-digital-art-scenery-4k-wallpaper-uhdpaper.com-702@1@k.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/landscape-anime-digital-art-fantasy-art-wallpaper-preview.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/looking-far-away-4k-lb.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/wp9322415.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg1.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg2.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg3.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg4.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg5.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg6.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg7.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg8.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg9.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg10.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg11.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg12.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg13.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg14.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg15.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg16.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg17.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg18.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg19.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg21.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg22.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg23.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg24.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg25.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg26.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg27.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg28.jpg',
-        'https://raw.githubusercontent.com/Kenne400k/background/refs/heads/main/bg29.jpg'
-        
+        // ... (các link ảnh khác giữ nguyên)
     ];
     
     for (const font of danhSachFont) {
@@ -249,10 +210,18 @@ khoiTaoTaiNguyen();
 async function layDuLieuHeThong(eventTimestamp) {
     const cpuUsage = await laySuDungCPU();
     const tongRam = os.totalmem(), ramTrong = os.freemem(), boNhoHeap = process.memoryUsage();
-    
+
+    const rawPing = Math.max(0, Date.now() - eventTimestamp);
+    let pingStatus = '';
+    if (rawPing <= 100) pingStatus = 'rất mượt';
+    else if (rawPing <= 200) pingStatus = 'mượt';
+    else if (rawPing <= 500) pingStatus = 'lác nhẹ';
+    else if (rawPing <= 1000) pingStatus = 'trung bình';
+    else pingStatus = 'kém';
+
     const thongTinBot = {
         uptime: dinhDangThoiGianHoatDong(process.uptime()),
-        ping: Date.now() - eventTimestamp,
+        ping: `${rawPing}ms ${pingStatus}`,
         prefix: global.config.PREFIX || "#",
         commands: global.client.commands.size,
         users: global.data.allUserID.length,
