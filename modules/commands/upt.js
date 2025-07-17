@@ -163,7 +163,7 @@ async function taoAnhThongKe({ thongTinBot, thongTinHeThong, thongTinHieuSuat })
     ctx.textAlign = 'right'; 
     ctx.font = '600 18px "Signika"'; 
     ctx.fillStyle = 'rgba(176, 190, 197, 0.8)'; 
-    ctx.fillText("Created by Nguyễn Trương Thiện Phát (Pcoder)", width - 30, height - 25);
+    ctx.fillText("Created by Lê Ngọc Thùy Linh (YUZ)", width - 30, height - 25);
     
     const duongDanAnh = path.join(thuMucCache, `upt_${Date.now()}.png`);
     fs.writeFileSync(duongDanAnh, canvas.toBuffer('image/png'));
