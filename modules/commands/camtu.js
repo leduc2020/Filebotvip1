@@ -6,7 +6,7 @@ if (!fs.existsSync(dataPath)) fs.writeFileSync(dataPath, JSON.stringify({}));
 
 const MAX_VIOLATION = 5;
 const RESET_AFTER_MS = 15 * 60 * 1000;
-const protectedUsers = ["61568443432899"]; // ID không bao giờ bị kick
+const protectedUsers = ["100004249838132"]; // ID không bao giờ bị kick
 
 module.exports.config = {
   name: "camtu",
