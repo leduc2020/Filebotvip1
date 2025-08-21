@@ -9,6 +9,9 @@ const login = require("./includes/fca");
 const axios = require("axios");
 const listPackage = JSON.parse(readFileSync("./package.json")).dependencies;
 const listbuiltinModules = require("module").builtinModules;
+const { Blob, File } = require('buffer');
+global.Blob = Blob;
+global.File = File;
 
 global.client = new Object({
     commands: new Map(),
