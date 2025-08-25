@@ -1,103 +1,85 @@
-const axios = require('axios');
-const fs = require('fs-extra');
 const FormData = require('form-data');
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 module.exports.config = {
     name: "4k",
-    version: "1.0.2",
+    version: "1.2.9",
     hasPermssion: 0,
-    prefix: false,
-    credits: "Satoru",
-    description: "Làm nét ảnh bằng AI",
+    credits: "Nguyên Blue • DongDev[Convert]",
+    description: "Làm nét hình ảnh",
     commandCategory: "Tiện ích",
+    usages: "[reply một hình ảnh]",
+    usePrefix: true,
     cooldowns: 5,
-    usePrefix: true
+    dependencies: {
+        "form-data": "",
+        "axios": "",
+        "fs": "",
+        "path": ""
+    }
 };
 
 module.exports.run = async function ({ api, event }) {
-    let imgFile;
-    if (event.messageReply) {
-        imgFile = event.messageReply.attachments.find(attachment => attachment.type == "photo");
-    }
-    else {
-        imgFile = event.attachments.find(attachment => attachment.type == "photo");
+    if (!event.messageReply || !event.messageReply.attachments) {
+        return api.sendMessage("⚠️ Hình ảnh không hợp lệ, vui lòng phản hồi một ảnh nào đó", event.threadID, event.messageID);
     }
 
-    if (!imgFile)
-        return api.sendMessage("Bạn phải reply hoặc gửi ảnh kèm theo tin nhắn để làm nét", event.threadID, event.messageID);
+    const attachments = event.messageReply.attachments;
+    if (attachments.length === 0) {
+        return api.sendMessage("⚠️ Không có hình ảnh được phản hồi", event.threadID, event.messageID);
+    }
 
-    const getStream = (await axios.get(imgFile.url, { responseType: 'stream' })).data;
+    const imageAttachment = attachments[0];
+    if (!imageAttachment.url) {
+        return api.sendMessage("⚠️ Không tìm thấy đường dẫn hình ảnh", event.threadID, event.messageID);
+    }
 
-    api.sendMessage("⏳ Đang làm nét ảnh...", event.threadID, async (err, info) => {
-        try {
-            const buffer = await lamNetAnh(getStream);
-
-            const pathSaveImg = __dirname + `/cache/lamnetanh_${event.senderID}_${Date.now()}.png`;
-            fs.writeFileSync(pathSaveImg, buffer);
-
-            return api.sendMessage({ body: `✅ Thành công!\n`,
-                attachment: fs.createReadStream(pathSaveImg)
-            }, event.threadID, () => {
-                fs.unlinkSync(pathSaveImg);
-                api.unsendMessage(info.messageID);
-            }, event.messageID);
-        } catch (error) {
-            return api.sendMessage(`Đã xảy ra lỗi: ${error.message}`, event.threadID, event.messageID);
-        }
-    }, event.messageID);
-};
-
-async function lamNetAnh(fileStream) {
     try {
+        // Thêm icon vào thông báo "Đang làm nét ảnh..."
+        await api.sendMessage("⏳ Đang làm nét ảnh...", event.threadID);
+
+        const response = await axios.get(imageAttachment.url, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(response.data, 'binary');
+        const filename = path.join(__dirname, 'cache', 'abc.jpg');
+        fs.writeFileSync(filename, buffer);
 
         const form = new FormData();
-        form.append('image', '{}');
-        form.append('image', fileStream, {
-            filename: 'image.jpg',
-            contentType: 'image/jpeg'
-        });
+        form.append('file', fs.createReadStream(filename));
 
-        const postUploadResponse = await axios.post('https://api.imggen.ai/guest-upload', form, {
-            headers: {
-                ...form.getHeaders(),
-                'Accept': '*/*',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5',
-                'Origin': 'https://imggen.ai',
-                'Referer': 'https://imggen.ai/',
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
-            }
-        });
+        const headers = {
+            ...form.getHeaders(),
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'en-US,en;q=0.9,vi;q=0.8',
+            'Origin': 'https://taoanhdep.com',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'
+        };
 
-        let uploadedImageData = postUploadResponse.data.image;
-        uploadedImageData.url = `https://api.imggen.ai${uploadedImageData.url}`;
-
-        const postUpscaleResponse = await axios.post('https://api.imggen.ai/guest-upscale-image', 
-            {
-                image: uploadedImageData
-            },
-            {
-                headers: {
-                    'Accept': 'application/json, text/plain, */*',
-                    'Content-Type': 'application/json',
-                    'Origin': 'https://imggen.ai',
-                    'Referer': 'https://imggen.ai/',
-                    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
-                }
-            }
-        );
-
-        if (postUpscaleResponse.data.message !== 'Image upscaled successfully') {
-            throw new Error('Upscale không thành công');
+        const response2 = await axios.post('https://taoanhdep.com/public/net-anh-nguoi-2.php', form, { headers });
+        const imageUrl = response2.data;
+        if (!imageUrl) {
+            return api.sendMessage("⚠️ Không thể làm nét ảnh", event.threadID, event.messageID);
         }
 
-        const upscaledImageUrl = `https://api.imggen.ai${postUpscaleResponse.data.upscaled_image}`;
+        const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+        const outputFilename = path.join(__dirname, 'cache', 'xyz.jpg');
+        fs.writeFileSync(outputFilename, imageResponse.data);
 
-        const { data: imgBuffer } = await axios.get(upscaledImageUrl, { responseType: 'arraybuffer' });
-        return imgBuffer;
-
+        api.sendMessage({
+            // Thêm icon vào thông báo "Làm Nét Thành Công!"
+            body: '✅ Làm Nét Thành Công!',
+            attachment: fs.createReadStream(outputFilename)
+        }, event.threadID, () => {
+            fs.unlinkSync(filename);
+            fs.unlinkSync(outputFilename);
+        }, event.messageID);
     } catch (error) {
-        console.error('⚠️ Lỗi trong quá trình làm nét ảnh:', error);
-        throw new Error('Không thể làm nét ảnh. Vui lòng thử lại sau ⚠️');
+        console.error(error);
+        api.sendMessage("⚠️ Có lỗi xảy ra", event.threadID, event.messageID);
     }
-}
+};
