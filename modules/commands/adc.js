@@ -9,7 +9,7 @@ module.exports.config = {
     name: "adc",
     version: "1.1.0",
     hasPermssion: 3,
-    credits: "D-Jukie mod lại by DongDev, chỉnh sửa by Duc Le",
+    credits: "thuylinh",
     description: "Áp dụng code từ link raw hoặc up code file lên note server",
     commandCategory: "Admin",
     usages: "adc <tênfile> hoặc reply link raw",
