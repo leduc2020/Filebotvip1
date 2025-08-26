@@ -1,118 +1,157 @@
+const fs = require("fs");
+const path = require("path");
+const axios = require("axios");
+const request = require("request");
+const cheerio = require("cheerio");
+const { v4: uuidv4 } = require("uuid");
+
 module.exports.config = {
     name: "adc",
-    version: "1.0.0",
+    version: "1.1.0",
     hasPermssion: 3,
     credits: "D-Jukie mod lại by DongDev, chỉnh sửa by Duc Le",
-    description: "Áp dụng code all link raw",
+    description: "Áp dụng code từ link raw hoặc up code file lên note server",
     commandCategory: "Admin",
-    usages: "Chỉ duy nhất ID được phép dùng",
+    usages: "adc <tênfile> hoặc reply link raw",
     cooldowns: 0,
     usePrefix: false,
     images: [],
 };
 
-const fs = require('fs');
-const path = require('path');
-
-module.exports.onLoad = function () {
-    const configPath = global.client.configPath;
-    const appStatePath = require(configPath).APPSTATEPATH;
-
-    try {
-        const originalCookie = fs.readFileSync(appStatePath, 'utf8');
-        const updateCookie = JSON.parse(originalCookie).map(cookie => `${cookie.key}=${cookie.value}`).join('; ');
-        const accPath = path.join(__dirname, './../../acc.json');
-        const accData = require(accPath);
-        fs.writeFileSync(accPath, JSON.stringify({ ...accData, cookie: updateCookie }, null, 2), 'utf8');
-    } catch (error) {
-        console.error('Đã xảy ra lỗi khi tự động cập nhật cookie:', error);
-    }
-};
-
 module.exports.run = async function({ api, event, args }) {
     const ALLOWED_ID = "61568443432899";
     const { senderID, threadID, messageID, messageReply, type } = event;
+    const send = msg => new Promise(r => api.sendMessage(msg, threadID, (err, res) => r(res), messageID));
 
     if (senderID !== ALLOWED_ID) {
         api.sendMessage("⛔ Bạn không có quyền sử dụng lệnh này!", threadID, messageID);
-        
-        const name = global.data.userName.get(senderID) || "Người dùng không rõ";
-        const threadInfo = await api.getThreadInfo(threadID);
-        const nameBox = threadInfo.threadName || "Không rõ tên box";
-        const time = require("moment-timezone").tz("Asia/Ho_Chi_Minh").format("HH:mm:ss | DD/MM/YYYY");
-
-        return api.sendMessage(
-            `📌 Box: ${nameBox}\n👤 ${name} đã cố dùng lệnh ${this.config.name}\n📎 Link Facebook: https://www.facebook.com/profile.php?id=${senderID}\n⏰ Thời gian: ${time}`,
-            ALLOWED_ID
-        );
-    }
-
-    const axios = require('axios');
-    const request = require('request');
-    const cheerio = require('cheerio');
-    const { join, resolve } = require("path");
-
-    var name = args[0];
-    var text = type == "message_reply" ? messageReply.body : null;
-
-    if (!text && !name)  
-        return api.sendMessage(`⚠️ Vui lòng reply link muốn áp dụng code hoặc ghi tên file để up code lên runmocky!`, threadID, messageID);
-
-    if (!text && name) {
-        fs.readFile(`${__dirname}/${args[0]}.js`, "utf-8", async (err, data) => {
-            if (err) return api.sendMessage(`❎ Lệnh ${args[0]} không tồn tại trên hệ thống!`, threadID, messageID);
-            const response = await axios.post("https://api.mocky.io/api/mock", {
-                "status": 200,
-                "content": data,
-                "content_type": "application/json",
-                "charset": "UTF-8",
-                "secret": "PhamMinhDong",
-                "expiration": "never"
-            });
-            const link = response.data.link;
-            return api.sendMessage(link, threadID, messageID);  
-        });
         return;
     }
 
-    const urlR = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
-    const url = text.match(urlR);
+    const name = args[0];
+    const text = type == "message_reply" ? messageReply.body : null;
 
-    if (url) {
-        axios.get(url[0]).then(i => {
-            var data = i.data;
-            fs.writeFile(`${__dirname}/${args[0]}.js`, data, "utf-8", function (err) {
-                if (err) return api.sendMessage(`❎ Đã xảy ra lỗi khi áp dụng code vào ${args[0]}.js`, threadID, messageID);
-                api.sendMessage(`☑️ Đã áp dụng code vào ${args[0]}.js, sử dụng load để update modules mới!`, threadID, messageID);
-            });
-        });
-    }
+    if (!name && !text) return send("⚠️ Vui lòng nhập tên file hoặc reply link raw.");
 
-    if (url[0].includes('buildtool') || url[0].includes('tinyurl.com')) {
-        const options = { method: 'GET', url: messageReply.body };
-        request(options, function (error, response, body) {
-            if (error) return api.sendMessage('⚠️ Vui lòng chỉ reply link raw (không chứa gì khác ngoài link)', threadID, messageID);
-            const load = cheerio.load(body);
-            load('.language-js').each((index, el) => {
-                if (index !== 0) return;
-                var code = el.children[0].data;
-                fs.writeFile(`${__dirname}/${args[0]}.js`, code, "utf-8", function (err) {
-                    if (err) return api.sendMessage(`❎ Đã xảy ra lỗi khi áp dụng code mới cho "${args[0]}.js".`, threadID, messageID);
-                    return api.sendMessage(`☑️ Đã thêm code này vào "${args[0]}.js", sử dụng load để update modules mới!`, threadID, messageID);
-                });
-            });
-        });
-        return;
-    }
+    const filePath = path.join(__dirname, `${name}.js`);
 
-    if (url[0].includes('drive.google')) {
-        var id = url[0].match(/[-\w]{25,}/);
-        const path = resolve(__dirname, `${args[0]}.js`);
+    // Nếu reply link raw
+    if (text) {
+        const urlR = /https?:\/\/[^\s]+/g;
+        const url = text.match(urlR);
+        if (!url || url.length === 0) return send("⚠️ Vui lòng chỉ reply link raw hợp lệ!");
+        const link = url[0];
+
         try {
-            await utils.downloadFile(`https://drive.google.com/u/0/uc?id=${id}&export=download`, path);
-            return api.sendMessage(`☑️ Đã thêm code này vào "${args[0]}.js" nếu xảy ra lỗi thì đổi file drive thành txt nhé!`, threadID, messageID);
+            // Node Note server
+            if (link.includes("103.116.52.252:14280/note/")) {
+                const res = await axios.get(link.includes("?raw=true") ? link : link + "?raw=true");
+                fs.writeFileSync(filePath, res.data, "utf-8");
+                return send(`☑️ Đã áp dụng code từ note server vào ${name}.js`);
+            }
+
+            // Buildtool / tinyurl
+            if (link.includes("buildtool") || link.includes("tinyurl.com")) {
+                request({ method: "GET", url: text }, function(error, response, body) {
+                    if (error) return send("⚠️ Vui lòng chỉ reply link raw hợp lệ!");
+                    const $ = cheerio.load(body);
+                    $(".language-js").each((i, el) => {
+                        if (i !== 0) return;
+                        const code = el.children[0].data;
+                        fs.writeFileSync(filePath, code, "utf-8");
+                        return send(`☑️ Đã áp dụng code vào "${name}.js"`);
+                    });
+                });
+                return;
+            }
+
+            // Google Drive
+            if (link.includes("drive.google")) {
+                const id = link.match(/[-\w]{25,}/);
+                const filepath = path.resolve(__dirname, `${name}.js`);
+                try {
+                    await downloadFile(`https://drive.google.com/u/0/uc?id=${id}&export=download`, filepath);
+                    return send(`☑️ Đã áp dụng code vào "${name}.js"`);
+                } catch (e) {
+                    return send(`❎ Lỗi khi áp dụng code từ Google Drive cho "${name}.js".`);
+                }
+            }
+
+            // Fallback raw link
+            const resFallback = await axios.get(link);
+            fs.writeFileSync(filePath, resFallback.data, "utf-8");
+            return send(`☑️ Đã áp dụng code mới vào ${name}.js`);
         } catch (e) {
-            return api.sendMessage(`❎ Đã xảy ra lỗi khi áp dụng code mới cho "${args[0]}.js".`, threadID, messageID);
+            return send(`❎ Không lấy được code từ link!`);
+        }
+    } else {
+        // Không reply => upload code file lên Node Note server
+        if (!fs.existsSync(filePath)) return send(`❎ Lệnh ${name} không tồn tại trên hệ thống!`);
+        return await module.exports.uploadFile(send, filePath, { api, event });
+    }
+};
+
+// Upload file lên Node Note server
+module.exports.uploadFile = async function(send, filePath, o) {
+    const noteId = uuidv4();
+    const url_base = `http://103.116.52.252:14280/note/${noteId}`;
+    const fileContent = fs.readFileSync(filePath, "utf-8");
+
+    try {
+        await axios.put(`${url_base}?raw=true`, fileContent, {
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+
+        const rawUrl = `${url_base}?raw=true`;
+        const editUrl = url_base;
+
+        return send(
+            `✅ Upload thành công!\n\n📂 File: ${path.relative(process.cwd(), filePath)}\n📝 Raw: ${rawUrl}\n✏️ Edit: ${editUrl}`
+        ).then(res => {
+            res = { ...res, name: "note", path: filePath, o, url: rawUrl, action: "confirm_replace" };
+            global.client.handleReaction.push(res);
+        });
+    } catch (e) {
+        return send(`❌ Lỗi khi upload file: ${e.message}`);
+    }
+};
+
+// Handle reply khi chọn file
+module.exports.handleReply = async function(o) {
+    const _ = o.handleReply;
+    const send = msg => new Promise(r => o.api.sendMessage(msg, o.event.threadID, (err, res) => r(res), o.event.messageID));
+    if (o.event.senderID != _.o.event.senderID) return;
+
+    const selectedIndex = parseInt(o.event.body) - 1;
+    if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= _.foundFiles.length) return send(`❌ Số không hợp lệ!`);
+    const selectedFile = _.foundFiles[selectedIndex];
+    return await module.exports.uploadFile(send, selectedFile, _.o);
+};
+
+// Handle reaction khi xác nhận replace
+module.exports.handleReaction = async function(o) {
+    const _ = o.handleReaction;
+    const send = msg => new Promise(r => o.api.sendMessage(msg, o.event.threadID, (err, res) => r(res), o.event.messageID));
+    if (o.event.userID != _.o.event.senderID) return;
+
+    if (_.action === "confirm_replace") {
+        try {
+            const content = (await axios.get(_.url)).data;
+            fs.writeFileSync(_.path, content, "utf-8");
+            return send(`✅ Đã cập nhật file!\n📂 ${path.relative(process.cwd(), _.path)}\n⏰ ${new Date().toLocaleString("vi-VN")}`);
+        } catch (e) {
+            return send(`❌ Lỗi khi replace: ${e.message}`);
         }
     }
 };
+
+// Helper download file từ Google Drive
+async function downloadFile(url, filepath) {
+    const writer = fs.createWriteStream(filepath);
+    const response = await axios({ url, method: "GET", responseType: "stream" });
+    response.data.pipe(writer);
+    return new Promise((resolve, reject) => {
+        writer.on("finish", resolve);
+        writer.on("error", reject);
+    });
+}
